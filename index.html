@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocoZen - Rotinas & Gamificação para TDAH</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#111827',
+                            900: '#0F172A',
+                            950: '#020617',
+                        },
+                        emerald: {
+                            400: '#34D399',
+                            500: '#10B981',
+                            600: '#059669',
+                        },
+                        cyan: {
+                            400: '#22D3EE',
+                            500: '#06B6D4',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Fontes Inter & Lucide Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Canvas Confetti para celebração visual -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        /* Estilos e animações customizadas para feedback de alta satisfação */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .task-card {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .task-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .completed-task {
+            opacity: 0.55;
+            text-decoration: line-through;
+        }
+
+        .progress-bar-glow {
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+        }
+
+        .pulse-slow {
+            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0F172A;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-full flex flex-col justify-between selection:bg-emerald-500 selection:text-slate-950">
+
+    <!-- BARRA SUPERIOR / STATUS DE GAMIFICAÇÃO -->
+    <header class="sticky top-0 z-30 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+        <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+            <!-- Logo & Badge PRO -->
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center font-bold text-slate-950 shadow-lg shadow-emerald-500/20">
+                    <i data-lucide="zap" class="w-5 h-5 fill-slate-950"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-slate-100 via-slate-200 to-slate-400 bg-clip-text text-transparent">FocoZen</span>
+                        <span id="proBadge" class="hidden text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 tracking-wider">PRO</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nível e Sequência -->
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full text-amber-400 text-xs font-semibold">
+                    <i data-lucide="flame" class="w-3.5 h-3.5 fill-amber-400"></i>
+                    <span id="streakCount">1</span>d
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700/60 px-3 py-1 rounded-full text-xs font-semibold text-cyan-400">
+                    <i data-lucide="award" class="w-3.5 h-3.5"></i>
+                    <span>Nív <span id="userLevel">1</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Progresso de XP -->
+        <div class="w-full bg-slate-800/60 h-1.5 relative overflow-hidden">
+            <div id="xpProgressBar" class="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-500 progress-bar-glow" style="width: 0%"></div>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL (Mobile-First Layout) -->
+    <main class="max-w-md mx-auto w-full px-4 pt-4 pb-24 flex-1 flex flex-col gap-5">
+        
+        <!-- PAINEL POMODORO RETRÁTIL -->
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl relative overflow-hidden">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="timer" class="w-4 h-4 text-emerald-400"></i>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Bloco de Foco sem Distração</h2>
+                </div>
+                <span id="pomoStatus" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">Pausado</span>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <div id="timerDisplay" class="text-3xl font-extrabold tracking-mono font-mono text-slate-100">
+                    25:00
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btnStartPomo" onclick="togglePomodoro()" class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition">
+                        <i data-lucide="play" class="w-4 h-4 fill-slate-950"></i>
+                        <span>Iniciar</span>
+                    </button>
+                    <button onclick="resetPomodoro()" class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 p-2 rounded-xl text-xs transition">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- CABEÇALHO DAS TAREFAS -->
+        <div class="flex items-center justify-between mt-1">
+            <div>
+                <h1 class="text-xl font-bold text-slate-100">Rotinas de Hoje</h1>
+                <p class="text-xs text-slate-400">Cumpra tarefas simples para ganhar XP</p>
+            </div>
+            <button onclick="openAddTaskModal()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 hover:text-cyan-300 p-2 rounded-xl text-xs flex items-center gap-1 font-medium transition active:scale-95">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Nova</span>
+            </button>
+        </div>
+
+        <!-- LISTA DE CHECKLIST DIÁRIO -->
+        <div id="taskList" class="flex flex-col gap-2.5">
+            <!-- Renderizado dinamicamente via JavaScript -->
+        </div>
+
+        <!-- TELA LIMPA / MENSAGEM DE PAZ MENTAL (Invisível por padrão) -->
+        <div id="cleanState" class="hidden flex-col items-center justify-center text-center py-10 px-4 bg-slate-900/50 border border-emerald-500/20 rounded-2xl">
+            <div class="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center text-emerald-400 mb-3 pulse-slow">
+                <i data-lucide="sparkles" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-lg font-bold text-emerald-400 mb-1">Mente Limpa & Foco Concluído!</h3>
+            <p class="text-xs text-slate-400 max-w-xs mb-4">Você venceu a paralisia hoje. Descanse seu cérebro ou adicione novos desafios.</p>
+            <button onclick="resetDailyTasks()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs px-4 py-2 rounded-xl font-medium transition">
+                Recarregar Rotinas Diárias
+            </button>
+        </div>
+
+        <!-- CARDS DE MONETIZAÇÃO SIMULADA -->
+        <section class="mt-4 border-t border-slate-800/80 pt-5 flex flex-col gap-3">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">Acelere sua Jornada</h2>
+            
+            <!-- Botão de Anúncio Premiado -->
+            <button onclick="playRewardedAd()" class="w-full bg-slate-900 hover:bg-slate-850 border border-cyan-500/30 p-3.5 rounded-2xl flex items-center justify-between text-left transition group active:scale-[0.99]">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition">
+                        <i data-lucide="play-circle" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-200">Assistir Anúncio (30s)</div>
+                        <div class="text-[11px] text-cyan-400/90 font-medium">+50 XP Extra + Manter Sequência</div>
+                    </div>
+                </div>
+                <span class="text-xs font-semibold bg-cyan-500/20 text-cyan-300 px-2.5 py-1 rounded-lg">Grátis</span>
+            </button>
+
+            <!-- Botão Lifetime PRO -->
+            <button onclick="openProModal()" id="btnProBanner" class="w-full bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 hover:from-emerald-900/60 border border-emerald-500/40 p-3.5 rounded-2xl flex items-center justify-between text-left transition group active:scale-[0.99]">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition">
+                        <i data-lucide="crown" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-100 flex items-center gap-1">
+                            Acesso Vitalício PRO
+                        </div>
+                        <div class="text-[11px] text-slate-400">Temas ilimitados, alarmes & sem anúncios</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs font-extrabold text-emerald-400 block">R$ 14,90</span>
+                    <span class="text-[9px] text-slate-400 uppercase tracking-wider">Única vez</span>
+                </div>
+            </button>
+        </section>
+    </main>
+
+    <!-- FOOTER FIXO / BARRA INFERIOR -->
+    <footer class="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-md border-t border-slate-800 z-20 py-2.5">
+        <div class="max-w-md mx-auto px-6 flex items-center justify-around text-slate-400 text-[11px] font-medium">
+            <button class="flex flex-col items-center gap-1 text-emerald-400">
+                <i data-lucide="check-square" class="w-5 h-5"></i>
+                <span>Checklist</span>
+            </button>
+            <button onclick="triggerSound('click'); alert('Modo Estatísticas em breve!')" class="flex flex-col items-center gap-1 hover:text-slate-200">
+                <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+                <span>Estatísticas</span>
+            </button>
+            <button onclick="openProModal()" class="flex flex-col items-center gap-1 hover:text-slate-200">
+                <i data-lucide="shield-check" class="w-5 h-5"></i>
+                <span>Recursos PRO</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- MODAL: NOVA TAREFA -->
+    <div id="addTaskModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xs w-full p-5 shadow-2xl relative">
+            <h3 class="text-base font-bold text-slate-100 mb-3 flex items-center gap-2">
+                <i data-lucide="plus-circle" class="w-4 h-4 text-cyan-400"></i>
+                Adicionar Foco Diário
+            </h3>
+            <input type="text" id="newTaskInput" placeholder="Ex: Beber 500ml de água" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 mb-4">
+            
+            <div class="flex items-center gap-2">
+                <button onclick="closeAddTaskModal()" class="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2.5 rounded-xl font-medium transition">Cancelar</button>
+                <button onclick="addTask()" class="w-1/2 bg-cyan-500 hover:bg-cyan-600 text-slate-950 text-xs font-bold py-2.5 rounded-xl transition">Adicionar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MONETIZAÇÃO LIFETIME (R$ 14,90) -->
+    <div id="proModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-emerald-500/30 rounded-3xl max-w-sm w-full p-6 shadow-2xl relative overflow-hidden">
+            <!-- Efeito Glow de Fundo -->
+            <div class="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl"></div>
+
+            <button onclick="closeProModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <div class="text-center mb-5">
+                <div class="w-12 h-12 bg-emerald-500/20 border border-emerald-500/40 rounded-2xl flex items-center justify-center text-emerald-400 mx-auto mb-3">
+                    <i data-lucide="gem" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-lg font-extrabold text-slate-100">FocoZen PRO Lifetime</h3>
+                <p class="text-xs text-slate-400 mt-1">Diga adeus às assinaturas mensais abusivas.</p>
+            </div>
+
+            <div class="space-y-3 mb-6 text-xs text-slate-300">
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Pagamento Único (Sem mensalidades)</span>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Temas visuais personalizados (Neon, Cyber, Soft)</span>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Alarmes com repetidor anti-procrastinação</span>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Selo PRO no perfil + Estatísticas avançadas</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center mb-5">
+                <div class="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Preço Promocional de Lançamento</div>
+                <div class="flex items-baseline justify-center gap-1">
+                    <span class="text-2xl font-black text-emerald-400">R$ 14,90</span>
+                    <span class="text-xs text-slate-500">/ acesso vitalício</span>
+                </div>
+            </div>
+
+            <button onclick="buyLifetimePro()" class="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 active:scale-95 text-slate-950 font-extrabold py-3.5 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/20 transition">
+                Garantir Acesso Vitalício
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: SIMULAÇÃO DE VÍDEO RECOMPENSADO -->
+    <div id="adModal" class="fixed inset-0 bg-slate-950/90 z-50 hidden flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-2xl p-6 relative">
+            <div class="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-4">Anúncio Premiado em Exibição</div>
+            
+            <div class="w-20 h-20 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 animate-spin mx-auto mb-6 flex items-center justify-center">
+                <span id="adTimer" class="text-xl font-bold text-slate-100">5</span>
+            </div>
+
+            <p class="text-xs text-slate-400">Aguarde o vídeo finalizar para receber seus pontos de bônus e proteger sua sequência!</p>
+        </div>
+    </div>
+
+    <!-- LÓGICA DO APLICATIVO -->
+    <script>
+        // ESTADO GLOBAL DO USUÁRIO
+        const defaultTasks = [
+            { id: 1, text: "💧 Beber 500ml de água", xp: 15, done: false },
+            { id: 2, text: "💊 Tomar medicação / suplementos", xp: 20, done: false },
+            { id: 3, text: "🧘 5 minutos de pausa/respiração", xp: 15, done: false },
+            { id: 4, text: "💻 Iniciar 1º bloco de foco (25 min)", xp: 30, done: false },
+            { id: 5, text: "🧹 Limpar a mesa de trabalho", xp: 20, done: false }
+        ];
+
+        let state = {
+            xp: 0,
+            level: 1,
+            streak: 1,
+            isPro: false,
+            tasks: [...defaultTasks]
+        };
+
+        // CARREGAR DADOS DO LOCAL STORAGE (SE EXISTIR)
+        function loadState() {
+            const saved = localStorage.getItem('focozen_state');
+            if (saved) {
+                try {
+                    state = JSON.parse(saved);
+                } catch (e) {
+                    console.error("Erro ao carregar dados salvos", e);
+                }
+            }
+            updateGamificationUI();
+            renderTasks();
+        }
+
+        function saveState() {
+            localStorage.setItem('focozen_state', JSON.stringify(state));
+        }
+
+        // GERENCIAMENTO DA INTERFACE E RECOMPENSAS
+        function updateGamificationUI() {
+            const xpForNextLevel = 100;
+            const progressPercent = Math.min(100, (state.xp / xpForNextLevel) * 100);
+
+            document.getElementById('userLevel').innerText = state.level;
+            document.getElementById('streakCount').innerText = state.streak;
+            document.getElementById('xpProgressBar').style.width = `${progressPercent}%`;
+
+            if (state.isPro) {
+                document.getElementById('proBadge').classList.remove('hidden');
+                const banner = document.getElementById('btnProBanner');
+                if (banner) {
+                    banner.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                                <i data-lucide="check-circle" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-emerald-400">Sua conta é PRO Vitalícia</div>
+                                <div class="text-[11px] text-slate-400">Todos os recursos liberados</div>
+                            </div>
+                        </div>
+                    `;
+                    banner.onclick = null;
+                }
+            }
+
+            // Atualiza ícones Lucide
+            lucide.createIcons();
+        }
+
+        function renderTasks() {
+            const taskContainer = document.getElementById('taskList');
+            const cleanState = document.getElementById('cleanState');
+            taskContainer.innerHTML = '';
+
+            const allCompleted = state.tasks.length > 0 && state.tasks.every(t => t.done);
+
+            if (allCompleted) {
+                taskContainer.classList.add('hidden');
+                cleanState.classList.remove('hidden');
+                cleanState.classList.add('flex');
+            } else {
+                taskContainer.classList.remove('hidden');
+                cleanState.classList.add('hidden');
+                cleanState.classList.remove('flex');
+
+                state.tasks.forEach(task => {
+                    const card = document.createElement('div');
+                    card.className = `task-card bg-slate-900 border ${task.done ? 'border-emerald-500/20 bg-emerald-950/10' : 'border-slate-800'} p-3.5 rounded-2xl flex items-center justify-between gap-3`;
+                    
+                    card.innerHTML = `
+                        <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="toggleTask(${task.id})">
+                            <div class="w-6 h-6 rounded-lg border ${task.done ? 'bg-emerald-500 border-emerald-500 text-slate-950' : 'border-slate-700 bg-slate-950'} flex items-center justify-center transition">
+                                ${task.done ? '<i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>' : ''}
+                            </div>
+                            <span class="text-xs font-medium ${task.done ? 'completed-task text-slate-500' : 'text-slate-200'}">${task.text}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">+${task.xp} XP</span>
+                            <button onclick="removeTask(${task.id})" class="text-slate-600 hover:text-rose-400 p-1 transition">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    `;
+                    taskContainer.appendChild(card);
+                });
+            }
+
+            lucide.createIcons();
+        }
+
+        // SISTEMA DE INTERAÇÃO COM TAREFAS
+        function toggleTask(id) {
+            const task = state.tasks.find(t => t.id === id);
+            if (!task) return;
+
+            task.done = !task.done;
+
+            if (task.done) {
+                // Ganha XP e lança efeitos visuais/sonoros
+                triggerSound('complete');
+                addXP(task.xp);
+
+                // Confete suave ao concluir tarefa
+                confetti({
+                    particleCount: 25,
+                    spread: 50,
+                    origin: { y: 0.7 },
+                    colors: ['#10B981', '#22D3EE', '#F59E0B']
+                });
+            } else {
+                triggerSound('click');
+            }
+
+            saveState();
+            renderTasks();
+
+            // Checa se limpou a tela inteira!
+            if (state.tasks.every(t => t.done)) {
+                setTimeout(() => {
+                    confetti({
+                        particleCount: 100,
+                        spread: 80,
+                        origin: { y: 0.5 }
+                    });
+                    triggerSound('levelup');
+                }, 300);
+            }
+        }
+
+        function addXP(amount) {
+            state.xp += amount;
+            if (state.xp >= 100) {
+                state.xp -= 100;
+                state.level += 1;
+                triggerSound('levelup');
+            }
+            updateGamificationUI();
+        }
+
+        function addTask() {
+            const input = document.getElementById('newTaskInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            state.tasks.push({
+                id: Date.now(),
+                text: text,
+                xp: 20,
+                done: false
+            });
+
+            input.value = '';
+            closeAddTaskModal();
+            saveState();
+            renderTasks();
+            triggerSound('click');
+        }
+
+        function removeTask(id) {
+            state.tasks = state.tasks.filter(t => t.id !== id);
+            saveState();
+            renderTasks();
+            triggerSound('click');
+        }
+
+        function resetDailyTasks() {
+            state.tasks.forEach(t => t.done = false);
+            saveState();
+            renderTasks();
+            triggerSound('click');
+        }
+
+        // MODAIS E CONTROLES DE FLUXO
+        function openAddTaskModal() {
+            document.getElementById('addTaskModal').classList.remove('hidden');
+        }
+        function closeAddTaskModal() {
+            document.getElementById('addTaskModal').classList.add('hidden');
+        }
+
+        function openProModal() {
+            document.getElementById('proModal').classList.remove('hidden');
+        }
+        function closeProModal() {
+            document.getElementById('proModal').classList.add('hidden');
+        }
+
+        function buyLifetimePro() {
+            state.isPro = true;
+            saveState();
+            closeProModal();
+            updateGamificationUI();
+            
+            confetti({ particleCount: 150, spread: 100, origin: { y: 0.4 } });
+            triggerSound('levelup');
+            alert("Parabéns! Sua conta agora é PRO Vitalícia. Todos os recursos foram desbloqueados!");
+        }
+
+        // SIMULAÇÃO DE ANÚNCIO PREMIADO
+        function playRewardedAd() {
+            const adModal = document.getElementById('adModal');
+            const adTimer = document.getElementById('adTimer');
+            adModal.classList.remove('hidden');
+            
+            let timeLeft = 5; // Simulação de 5 segundos para testes ágeis
+            adTimer.innerText = timeLeft;
+
+            const interval = setInterval(() => {
+                timeLeft--;
+                adTimer.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(interval);
+                    adModal.classList.add('hidden');
+                    
+                    // Recompensa
+                    addXP(50);
+                    state.streak += 1;
+                    saveState();
+                    updateGamificationUI();
+                    
+                    confetti({ particleCount: 50, spread: 60 });
+                    alert("Recompensa recebida! +50 XP adicionados e sua Sequência Diária foi mantida.");
+                }
+            }, 1000);
+        }
+
+        // TIMING / POMODORO LOGIC
+        let pomoMinutes = 25;
+        let pomoSeconds = 0;
+        let pomoTimer = null;
+        let isPomoRunning = false;
+
+        function updateTimerDisplay() {
+            const m = String(pomoMinutes).padStart(2, '0');
+            const s = String(pomoSeconds).padStart(2, '0');
+            document.getElementById('timerDisplay').innerText = `${m}:${s}`;
+        }
+
+        function togglePomodoro() {
+            const btn = document.getElementById('btnStartPomo');
+            const status = document.getElementById('pomoStatus');
+
+            if (isPomoRunning) {
+                clearInterval(pomoTimer);
+                isPomoRunning = false;
+                btn.innerHTML = `<i data-lucide="play" class="w-4 h-4 fill-slate-950"></i><span>Iniciar</span>`;
+                status.innerText = "Pausado";
+                status.className = "text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400";
+            } else {
+                isPomoRunning = true;
+                btn.innerHTML = `<i data-lucide="pause" class="w-4 h-4 fill-slate-950"></i><span>Pausar</span>`;
+                status.innerText = "Em Foco";
+                status.className = "text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+
+                pomoTimer = setInterval(() => {
+                    if (pomoSeconds === 0) {
+                        if (pomoMinutes === 0) {
+                            clearInterval(pomoTimer);
+                            isPomoRunning = false;
+                            addXP(40);
+                            triggerSound('levelup');
+                            alert("Bloco de Foco Concluído! Você ganhou +40 XP!");
+                            resetPomodoro();
+                            return;
+                        }
+                        pomoMinutes--;
+                        pomoSeconds = 59;
+                    } else {
+                        pomoSeconds--;
+                    }
+                    updateTimerDisplay();
+                }, 1000);
+            }
+            lucide.createIcons();
+        }
+
+        function resetPomodoro() {
+            clearInterval(pomoTimer);
+            isPomoRunning = false;
+            pomoMinutes = 25;
+            pomoSeconds = 0;
+            updateTimerDisplay();
+            const btn = document.getElementById('btnStartPomo');
+            const status = document.getElementById('pomoStatus');
+            btn.innerHTML = `<i data-lucide="play" class="w-4 h-4 fill-slate-950"></i><span>Iniciar</span>`;
+            status.innerText = "Pausado";
+            status.className = "text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400";
+            lucide.createIcons();
+        }
+
+        // SINTETIZADOR DE ÁUDIO WEB NATIVO (Sem dependências externas)
+        function triggerSound(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'click') {
+                    osc.frequency.setValueAtTime(400, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.05);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.05);
+                } else if (type === 'complete') {
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                    osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+                    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.15);
+                } else if (type === 'levelup') {
+                    osc.frequency.setValueAtTime(440, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.3);
+                }
+            } catch (e) {
+                // Silencioso caso o áudio esteja bloqueado no navegador
+            }
+        }
+
+        // INICIALIZAÇÃO
+        window.onload = function() {
+            loadState();
+        };
+    </script>
+</body>
+</html>
